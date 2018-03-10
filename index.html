@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Бот</title>
+    <link rel="stylesheet" type="text/css" href="normalize.css">
+    <link rel="stylesheet" type="text/css" href="style_pref.css">
+</head>
+<body>
+
+<div class="wrapper">
+
+    <form class="form">
+        <input class="form__input" type="text" placeholder="Задайте вопрос боту..." required>
+        <button class="form__send" type="submit">Отправить</button>
+    </form>
+
+    <div class="chat"></div>
+</div>
+<script src="bot.js"></script>
+<script>
+    /* Действия при загрузки DOM страницы */
+    document.addEventListener("DOMContentLoaded", function () {
+        var botBrain = new Bot_ns.BotBrain(); // Объект мозга бота
+    });
+</script>
+</body>
+</html>
