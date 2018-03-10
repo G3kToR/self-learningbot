@@ -208,6 +208,7 @@ var Bot_ns = (function () {
         new Message(0, 'Ой, похоже что-то с памятью, нужно меня перезагрузить. Если не поможет напиши: "сброс".').addInDOM();
     };
 
+
     /* Класс мозга бота  */
     function BotBrain() {
         this.form = new Form(); // Объект формы ввода
@@ -222,7 +223,7 @@ var Bot_ns = (function () {
     BotBrain.prototype.setTypeForm = function (type) {  // Устанавливает типа формы от имени бота
         if (type == 0) {
             this.form.setType(0,this.onSend_quest.bind(this)); // Запускает режим ожидания вопроса
-            this.startWaitQuests(); // Запускает ожидающие вопросы каждые 5 секунд
+//!!!!!!!!!this.startWaitQuests(); // Запускает ожидающие вопросы каждые 5 секунд
         } else if (type == 1) {
             this.form.setType(1,this.onSend_ask.bind(this)); // Запускает режим знакомства
             new Message(0,new BotQuestions().getAnsQuest()).addInDOM();
@@ -268,19 +269,39 @@ var Bot_ns = (function () {
     };
     BotBrain.prototype.findAnsQuest = function (text) {
         this.cacheQuest = text; // Сохраняем последний тест вопроса
-        var word_arr = text.split(' '); // Разбиваем сообщение юзера в массив
+
         var archive = this.memory.getMem(); // Берем данные из памяти
+
+        //
+        var message = this.getContext(text);
+
+        var word_arr = message[0].split(' '); // Разбиваем сообщение юзера в массив
+        var regexp = /[цкнгшщзхфвпрлджчсмтб]/ig;
+        word_arr = word_arr.map(function (item) {
+            if (item.length == 1) return item.substring(0, i+1);
+            for (var i = item.length-1; i != 0; i--) {
+                if (item[i].search(regexp) > -1) {
+                    console.log(item.substring(0, i+1),' ',i);
+                    return item.substring(0, i+1);
+                    break;
+                }
+            }
+        });
+        //console.log(word_arr);
 
         var answerArr = []; // массив предпологаемых ответов
         archive.forEach(function(itemAr, iAr) { // Проходимся по архиву вопросов
             var colTwin = 0; // Количесво совпадений
             // Проходимся по словам текущего вопроса и ищем кол-во вхождения слов
             word_arr.forEach(function(item, i) {
-                if ((itemAr.quest.match(new RegExp("(^|\\s)"+item+"(\\s|$)", "g")) || []).length > 0) colTwin++;
+                //if ((itemAr.quest.match(new RegExp("(^|\\s)"+item+"(\\s|$)", "g")) || []).length > 0) colTwin++;
+                if ((itemAr.quest.match(new RegExp("(^|\\s)"+item, "g")) || []).length > 0) colTwin++;
             });
             // Если процент совпадений слов больше 25 помещаем в массив предпологаемых ответов
-            if ((100*colTwin/(word_arr.length) > 25))
-                answerArr.push([itemAr.answer,itemAr.colWord,colTwin]); // Если хоть одно слово совподает заносим в массив
+            var proc = 100*colTwin/(word_arr.length);
+            console.log(proc,' ',itemAr.quest, ' ',colTwin);
+            if (proc > 25)
+                answerArr.push([itemAr.answer,itemAr.colWord,proc,itemAr.context]); // Если хоть одно слово совподает заносим в массив
         });
 
         /*// Эксперемент: поиск в ответах
@@ -299,17 +320,43 @@ var Bot_ns = (function () {
         if (answerArr.length == 0) return this.setTypeForm(1);  // Установка типа формы на слуш. ответ
 
         // Обрабатываем выборку из предыдущего шага. Находим вопрос с максимальным совпадением.
-        var result = ['',0,0]; // [ответ,кол-во слов в вопроск,кол-во совпадений слов]
+        /*var result = ['',0,0]; // [ответ,кол-во слов в вопроск,кол-во совпадений слов]
         answerArr.forEach(function(item, i) {
             var this_proc = (100*item[2]/item[1]);
             if (this_proc > 25 && this_proc >= result[1] && item[2] >= result[2]) {
                 result = [item[0],this_proc,item[2]];
             }
+        });*/
+        var result = ['',0,0,[]]; // [ответ,кол-во слов в вопроск,кол-во совпадений слов]
+        answerArr.forEach(function(item, i) {
+            if (item[2] > result[2]) {
+                result = item;
+                console.log(item[2],' ',item[0]);
+            } 
+           /* var this_proc = (100*item[2]/item[1]);
+            //console.log(this_proc,' ',item[0]);
+            if (this_proc > 25 && this_proc >= result[1] && item[2] >= result[2]) {
+                result = [item[0],this_proc,item[2]];
+            }*/
         });
         if (result[0].length == 0) return this.setTypeForm(1); // Если нет ответа режим ответа
 
         new Message(0,result[0]).addInDOM(); // Выводим результат
         archive = null; answerArr = null;
+    };
+    BotBrain.prototype.getContext = function (quest) {
+        var questWords = ['кто','что','где','когда','тако.*?\\s','из','чего','скольк.*?\\s','как'];
+        var context = [];
+        questWords.forEach(function (item,i) {
+            quest = quest.replace(new RegExp(item, "g"),function(str, offset, s) {
+                //console.log( "Найдено: " + str + " на позиции: " + offset + " в строке: " + s );
+                context.push(str.trim());
+                return str.substr(offset+str.length);
+            });
+        });
+        quest = quest.trim();
+        //console.log([quest,context]);
+        return [quest,context];
     };
     BotBrain.prototype.onSend_hello = function () { // Колбэк при отправки формы знакомства
         var text = this.form.onSend();
@@ -348,14 +395,10 @@ var Bot_ns = (function () {
         var quest = this.cacheQuest; // Вопрос заданный пользователем
 
         // Удаляем лишние слова из вопроса
-        var questWords = ['кто','что','где','когда','тако.*?\\s','из','чего','сколько','как'];
-        questWords.forEach(function (item,i) {
-            quest = quest.replace(new RegExp(item, "g"),'');
-        });
-        quest = quest.trim();
+        quest = this.getContext(quest);
 
         // Загружаем ответ в память
-        this.memory.putInMem({colWord: quest.split(" ").length, quest: quest, answer: text});
+        this.memory.putInMem({colWord: quest[0].split(" ").length, quest: quest[0], context: quest[1], answer: text});
         new Message(0,new BotQuestions().getThankAsk()).addInDOM();
         this.setTypeForm(0); // Устанавливаем форму в слуш. вопроса
         questWords = null;

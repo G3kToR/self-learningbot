@@ -21,6 +21,7 @@
 <script>
     /* Действия при загрузки DOM страницы */
     document.addEventListener("DOMContentLoaded", function () {
+        console.log(localStorage.getItem('memory'));
         var botBrain = new Bot_ns.BotBrain(); // Объект мозга бота
     });
 </script>

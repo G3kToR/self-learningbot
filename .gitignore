@@ -1,2 +1,5 @@
+.gitignore
 *.log
 .idea/
+Block_1/
+style.css
