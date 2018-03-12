@@ -179,41 +179,11 @@ var Bot_ns = (function () {
         return thankAns[this.randQuest(thankAns.length)];
     };
 
-    /* Класс для работы с памятью бота */
-    function Memory() {
-        this.memory = [];
-        this.loadMem();
-    }
-    Memory.prototype.loadMem = function () { // Загрузка данных из локалсторадж
-        try {
-            var memory = localStorage.getItem('memory');
-            this.memory = (memory == null) ? [] : JSON.parse(memory);
-        } catch (err) {
-            this.getError(err);
-        }
-    };
-    Memory.prototype.getMem = function () { // Получение данных из памяти
-        return this.memory;
-    };
-    Memory.prototype.putInMem = function (val) { // Загрузка данных в память
-        try {
-            this.memory.push(val);
-            saveLocalData('memory',JSON.stringify(this.memory));
-        } catch (err) {
-            this.getError(err);
-        }
-    };
-    Memory.prototype.getError = function (err) { // Вызывает сообщение об ошибке
-        console.log('Ошибка ' + err.name + ":" + err.message + "\n" + err.stack);
-        new Message(0, 'Ой, похоже что-то с памятью, нужно меня перезагрузить. Если не поможет напиши: "сброс".').addInDOM();
-    };
-
 
     /* Класс мозга бота  */
     function BotBrain() {
         this.form = new Form(); // Объект формы ввода
-        this.memory = new Memory(); // Подключаем память
-        this.cacheQuest = '';
+        this.memory = new BotMemory();
         this.onStart();
     }
     BotBrain.prototype.onStart = function () { // Начало общения
@@ -267,97 +237,12 @@ var Bot_ns = (function () {
         localStorage.clear();
         location.href=location.href;
     };
-    BotBrain.prototype.findAnsQuest = function (text) {
-        this.cacheQuest = text; // Сохраняем последний тест вопроса
-
-        var archive = this.memory.getMem(); // Берем данные из памяти
-
-        //
-        var message = this.getContext(text);
-
-        var word_arr = message[0].split(' '); // Разбиваем сообщение юзера в массив
-        var regexp = /[цкнгшщзхфвпрлджчсмтб]/ig;
-        word_arr = word_arr.map(function (item) {
-            if (item.length == 1) return item.substring(0, i+1);
-            for (var i = item.length-1; i != 0; i--) {
-                if (item[i].search(regexp) > -1) {
-                    console.log(item.substring(0, i+1),' ',i);
-                    return item.substring(0, i+1);
-                    break;
-                }
-            }
-        });
-        //console.log(word_arr);
-
-        var answerArr = []; // массив предпологаемых ответов
-        archive.forEach(function(itemAr, iAr) { // Проходимся по архиву вопросов
-            var colTwin = 0; // Количесво совпадений
-            // Проходимся по словам текущего вопроса и ищем кол-во вхождения слов
-            word_arr.forEach(function(item, i) {
-                //if ((itemAr.quest.match(new RegExp("(^|\\s)"+item+"(\\s|$)", "g")) || []).length > 0) colTwin++;
-                if ((itemAr.quest.match(new RegExp("(^|\\s)"+item, "g")) || []).length > 0) colTwin++;
-            });
-            // Если процент совпадений слов больше 25 помещаем в массив предпологаемых ответов
-            var proc = 100*colTwin/(word_arr.length);
-            console.log(proc,' ',itemAr.quest, ' ',colTwin);
-            if (proc > 25)
-                answerArr.push([itemAr.answer,itemAr.colWord,proc,itemAr.context]); // Если хоть одно слово совподает заносим в массив
-        });
-
-        /*// Эксперемент: поиск в ответах
-        if (answerArr.length == 0)
-        archive.forEach(function(itemAr, iAr) { // Проходимся по архиву вопросов
-            var colTwin = 0; // Количесво совпадений
-            // Проходимся по словам текущего вопроса и ищем кол-во вхождения слов
-            word_arr.forEach(function(item, i) {
-                if ((itemAr.answer.match(new RegExp("(^|\\s)"+item+"(\\s|$)", "g")) || []).length > 0) colTwin++;
-            });
-            // Если процент совпадений слов больше 25 помещаем в массив предпологаемых ответов
-            if ((100*colTwin/(word_arr.length) > 25))
-                answerArr.push([itemAr.quest,itemAr.colWord,colTwin]); // Если хоть одно слово совподает заносим в массив
-        });*/
-
-        if (answerArr.length == 0) return this.setTypeForm(1);  // Установка типа формы на слуш. ответ
-
-        // Обрабатываем выборку из предыдущего шага. Находим вопрос с максимальным совпадением.
-        /*var result = ['',0,0]; // [ответ,кол-во слов в вопроск,кол-во совпадений слов]
-        answerArr.forEach(function(item, i) {
-            var this_proc = (100*item[2]/item[1]);
-            if (this_proc > 25 && this_proc >= result[1] && item[2] >= result[2]) {
-                result = [item[0],this_proc,item[2]];
-            }
-        });*/
-        var result = ['',0,0,[]]; // [ответ,кол-во слов в вопроск,кол-во совпадений слов]
-        answerArr.forEach(function(item, i) {
-            if (item[2] > result[2]) {
-                result = item;
-                console.log(item[2],' ',item[0]);
-            } 
-           /* var this_proc = (100*item[2]/item[1]);
-            //console.log(this_proc,' ',item[0]);
-            if (this_proc > 25 && this_proc >= result[1] && item[2] >= result[2]) {
-                result = [item[0],this_proc,item[2]];
-            }*/
-        });
-        if (result[0].length == 0) return this.setTypeForm(1); // Если нет ответа режим ответа
-
-        new Message(0,result[0]).addInDOM(); // Выводим результат
-        archive = null; answerArr = null;
+    BotBrain.prototype.findAnsQuest = function (text) { // Ищем ответ на вопрос в памяти
+        var answer = this.memory.setQuery(text);
+        if (answer.length == 0) return this.setTypeForm(1);  // Установка типа формы на слуш. ответ
+        new Message(0,answer).addInDOM(); // Выводим результат
     };
-    BotBrain.prototype.getContext = function (quest) {
-        var questWords = ['кто','что','где','когда','тако.*?\\s','из','чего','скольк.*?\\s','как'];
-        var context = [];
-        questWords.forEach(function (item,i) {
-            quest = quest.replace(new RegExp(item, "g"),function(str, offset, s) {
-                //console.log( "Найдено: " + str + " на позиции: " + offset + " в строке: " + s );
-                context.push(str.trim());
-                return str.substr(offset+str.length);
-            });
-        });
-        quest = quest.trim();
-        //console.log([quest,context]);
-        return [quest,context];
-    };
+
     BotBrain.prototype.onSend_hello = function () { // Колбэк при отправки формы знакомства
         var text = this.form.onSend();
         userObj.name = text;
@@ -392,16 +277,209 @@ var Bot_ns = (function () {
         new Message(1,text).addInDOM(); // Вывод введенного сообщения пользователем
         text = this.clearText(text); // Удаляем знаки препинания и в нижний регистр
         if (text == 'отмена') return this.setTypeForm(0); // Устанавливаем форму в слуш. вопроса
-        var quest = this.cacheQuest; // Вопрос заданный пользователем
-
-        // Удаляем лишние слова из вопроса
-        quest = this.getContext(quest);
 
         // Загружаем ответ в память
-        this.memory.putInMem({colWord: quest[0].split(" ").length, quest: quest[0], context: quest[1], answer: text});
+        this.memory.saveAnsQuery(text);
         new Message(0,new BotQuestions().getThankAsk()).addInDOM();
         this.setTypeForm(0); // Устанавливаем форму в слуш. вопроса
-        questWords = null;
+    };
+
+    /* Класс для работы с памятью бота (ИИ) */
+    function BotMemory() {
+        this.query = '';
+        this.newWords = null;
+        this.words = null;
+        this.assocs = null;
+        this.net = null;
+        this.unNormQueryVec = null; // номера слов из словаря
+        this.normQueryVec = null; // 0 и 1
+        this.loadMemory();
+    }
+    BotMemory.prototype.loadMemory = function () { // Загрузка памяти из локалсторедж
+        try {
+            var memory = localStorage.getItem('memory');
+            if (memory == null) {
+                this.words = [];
+                this.assocs = [];
+            } else {
+                memory = JSON.parse(memory);
+                this.words = memory.words;
+                this.assocs = memory.assocs;
+                if (memory.net != null) {
+                    var net = new brain.NeuralNetwork();
+                    this.net = net.fromJSON(memory.net);
+                }
+            }
+        } catch (err) {
+            this.getError(err);
+        }
+    };
+    BotMemory.prototype.setQuery = function (query) { // Сохранение запроса
+        this.query = this.clearQuery(query);
+        this.getUnNormQueryVec();
+        this.getNormQueryVec();
+        if (this.words.length == 0) return '';
+        var answer = this.findAnsQuery(); // Ищем ответ на вопрос
+        return (!answer) ? '': answer;
+    };
+    BotMemory.prototype.clearQuery = function (text) {
+        var delWords = ['в','на','под','с','и','над'];
+        for (var i = 0; i != delWords.length; i++) {
+            text = text.replace(new RegExp("(^|\\s)"+delWords[i]+"($|\\s)", "ig"),function(str, offset) {
+                return str.substr(offset+str.length-1);
+            });
+        }
+        return text.trim();
+    };
+    BotMemory.prototype.getUnNormQueryVec = function () { // Получение запроса из цифр
+        var word_arr = this.query.split(' ');
+        var word_str = word_arr.join('|');
+        //var unigram = this.Stemming();
+        var result = [];
+        for (var i = 0; i != this.words.length; i++) {
+            var word = this.words[i];
+            if ((word.match(new RegExp("(^|\\s)("+word_str+")($|\\s)", "ig")) || []).length > 0) {
+                result.push(i);
+                var ind = word_arr.indexOf(word);
+                if (ind > -1) word_arr.splice(ind,1);
+            }
+        }
+        //console.log('new', word_arr);
+        //console.log('Unnorm ',result);
+        this.newWords = word_arr;
+        this.unNormQueryVec = result;
+        if (result.length == 0) return false;
+    };
+    BotMemory.prototype.getNormQueryVec = function () { // Получение вектора из предложения в цифровом виде
+        var result = [];
+        var _this = this;
+        this.unNormQueryVec.forEach(function (item) {
+            var itemVec = [];
+            for (var i = 0; i!= _this.words.length; i++) {
+                if (i == item) itemVec.push(1);
+                else itemVec.push(0);
+            }
+            result = _this.sumVectors(itemVec,result);
+        });
+        this.normQueryVec = result;
+        return result;
+    };
+    BotMemory.prototype.getNormWordVec = function (id) { // Создает вектор слова
+        var result = [];
+        for (var i = 0; i != this.words.length; i++){
+            if (i == id) result.push(1);
+            else result.push(0);
+        }
+        return result;
+    };
+    /*BotMemory.prototype.Stemming = function () { // Удаление окончаний у не нужных слов
+        var word_arr = this.query.split(' ');
+        var delWords = 'кто что где когда как сколько скольких чего из такой такая таких';
+        var regexp = /[цкнгшщзхфвпрлджчсмтб]/ig;
+        return word_arr.map(function (item) {
+            if (item.length == 1) return item.substring(0, i+1);
+            if ((delWords.match(new RegExp("(^|\\s)("+item+")($|\\s)", "ig")) || []).length > 0)
+            for (var i = item.length-1; i != 0; i--) {
+                if (item[i].search(regexp) > -1) {
+                    console.log(item.substring(0, i + 1), ' ', i);
+                    return item.substring(0, i + 1);
+                    break;
+                }
+            }
+            else return item;
+        });
+    };*/
+    BotMemory.prototype.setArrayLength = function (array,length) { // Задача массива нужной длинны
+        if (array.length > length) {
+            array.length = length;
+            return array;
+        }
+        for (var i = array.length; i != length;  i++)  array.push(0);
+        return array;
+    };
+    BotMemory.prototype.sumVectors = function (arr1,arr2) { // Сложение векторов
+        return arr1.map(function (item, i) {
+            if (arr1[i] == undefined) arr1[i] = 0;
+            if (arr2[i] == undefined) arr2[i] = 0;
+            if (item == 1 && arr2[i] == 1) return 1;
+            else return item+arr2[i];
+        });
+    };
+    BotMemory.prototype.trainObj = function () { // Создание объекта для треннировки сетки
+        if (this.assocs.length == 0) return false;
+        var _this = this;
+        return this.assocs.map(function (item, i) {
+            return {
+                input: _this.setArrayLength(item[0],_this.words.length),
+                output: _this.setArrayLength(item[1],_this.words.length)
+            };
+        });
+    };
+    //BotMemory.prototype.loadNet
+    BotMemory.prototype.trainNN = function () { // Треннировка сети
+        if (this.assocs.length == 0) return false;
+        var net = new brain.NeuralNetwork();
+        net.train(this.trainObj());
+        this.net = net;
+    };
+    BotMemory.prototype.findAnsQuery = function () { // Ищет ответ на запрос с помощью сети
+        /*if (this.net == null && this.words.length > 0 && this.assocs.length > 0) this.trainNN();
+        else return false;*/
+        var output = this.net.run(this.normQueryVec);
+        console.log(output);
+        var maxOut = [0,0];
+        output = output.map(function (item,i) {
+            if (item > maxOut[0]) maxOut = [item,i];
+            return (item > 0.5) ? 1 : 0;
+        });
+
+        var wordId = output.indexOf(1);
+        var answer;
+        if (wordId > -1) answer = this.words[wordId];
+        else {
+            if (maxOut[0] > 0.25) answer = this.words[maxOut[1]];
+            else answer = false;
+        }
+        return answer;
+    };
+    BotMemory.prototype.saveAnsQuery = function (answer) {
+        if (this.newWords != null && this.newWords.length > 0)
+            for (var i = 0; i != this.newWords.length; i++) { // Добавляем неизвестные слова из вопроса в словарь
+                this.words.push(this.newWords[i]);
+                var wordInd = this.words.length-1;
+                this.normQueryVec = this.sumVectors(this.getNormWordVec(wordInd),this.normQueryVec);
+            }
+        var ansInd = null;
+        if (this.words.length > 0)
+            for (var i = 0; i != this.words.length; i++) { // Ищем ответ в словаре
+                if ((this.words[i].match(new RegExp("(^|\\s)"+answer+"($|\\s)", "ig")) || []).length > 0) {
+                    ansInd = i;
+                    break;
+                }
+            }
+        if (ansInd == null) { // Если такого ответа нет, добовляем в словарь
+            this.words.push(answer);
+            var ansInd = this.words.length-1;
+        }
+        var normAnsVec = this.getNormWordVec(ansInd); // Получаем нормальный вектор ответа
+        this.assocs.push([this.normQueryVec,normAnsVec]); // Заносим во временную память
+        this.trainNN(); // Треннируем сеть
+        this.putInMemory(); // Сохраняем в кэш (локалсторедж)
+    };
+    BotMemory.prototype.putInMemory = function () { // Загрузка данных в память
+        try {
+            var memory = {};
+            memory.words = this.words;
+            memory.assocs = this.assocs;
+            memory.net = this.net.toJSON();
+            saveLocalData('memory',JSON.stringify(memory));
+        } catch (err) {
+            this.getError(err);
+        }
+    };
+    BotMemory.prototype.getError = function (err) { // Вызывает сообщение об ошибке
+        console.log('Ошибка ' + err.name + ":" + err.message + "\n" + err.stack);
+        new Message(0, 'Ой, похоже что-то с памятью, нужно меня перезагрузить. Если не поможет напиши: "сброс".').addInDOM();
     };
 
     // Экспортируем методы модуля
